@@ -1,0 +1,60 @@
+---
+title: "Causal Effect"
+author: "Tanay Janmanchi"
+format: html
+execute: 
+  echo: false
+---
+
+```{r}
+#|message: false
+library(tidyverse)
+library(primer.data)
+library(brms)
+library(tidybayes)
+library(gtsummary)
+```
+
+```{r}
+ch6 <- trains |>
+  select(att_end, treatment) |>
+  summary()
+```
+
+```{r}
+#| cache: TRUE
+fit_gauss <- brm(formula = att_end ~ treatment,
+                data = ch6,
+                family = gaussian(),
+                refresh = 0,
+                silent = 2,
+                seed = 9)
+```
+
+```{r}
+tbl_regression(fit_gauss)
+```
+
+```{r}
+ndata = tibble(treatment = c("Treated", "Control"))
+
+
+fit_gauss |> 
+  add_epred_draws(
+    newdata = ndata) |> 
+  pivot_wider(id_cols = .draw, names_from = treatment, values_from = .epred) |> 
+  mutate(causal_effect = Treated - Control) |> 
+  ggplot(aes(x = causal_effect)) +
+    geom_histogram(aes(y = after_stat(count/sum(count))), 
+                   bins = 100) + 
+  scale_y_continuous(labels = scales::percent_format()) + 
+  theme_classic() + 
+  labs(title = "Posterior for Average Treatment Effect",
+         subtitle = "Exposure to Spanish-speakers shifts immigration attitudes rightward",
+         x = "Difference in Attitude",
+         y = "Probability")
+
+```
+
+
+Using data from a 2012 survey of Boston-area commuters, we seek to measure the causal effect of exposure to Spanish-speakers on attitudes toward immigration among adults in Chicago and similar cities in 2024. There is some concern that the relationship has changed since our data was collected. We modeled attitude toward immigration, measured on a 3 to 15 integer scale, as a linear function of treatment. The average causal effect of treatment was about 1.5, with a 95% confidence interval of 0.5 to 2.5. For context, the difference in attitude between Democrats and Republicans is about 1.7. So, the causal effect of 1.5 means that we would expect a treated Democrat to become almost as conservative on immigration as a typical Republican.
